@@ -21,7 +21,7 @@ int main () {
 		} else {
 			printf("Illegal!\n");
 		}
-		switch (query_state(ch.board)) {
+		switch (ch.board.query_state()) {
 			case 0:
 				printf("Ongoing.\n");
 				break;

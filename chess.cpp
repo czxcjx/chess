@@ -3,6 +3,9 @@
 #include <cstring>
 #include <cstdio>
 
+int side(ChessPiece c);
+char print_piece(ChessPiece p);
+
 Chess::Chess() {
 	board.grid[0][0] = board.grid[7][0] = PIECE_WROOK;
 	board.grid[1][0] = board.grid[6][0] = PIECE_WKNIGHT;
@@ -31,52 +34,6 @@ int side(ChessPiece c) {
 	if (c==PIECE_EMPTY) return 2;
 	else if (c>=PIECE_WPAWN && c<=PIECE_WKING) return 0;
 	return 1;
-}
-
-bool is_attacked(const Board & board, pii sq) {
-	std::list<ppii> moves;
-	gen_trymoves(board, moves);
-	for (std::list<ppii>::iterator it = moves.begin(); it != moves.end(); it++) {
-		if (it->second == sq) return true;
-	}
-	return false;
-}
-
-void gen_moves(const Board & board, std::list<ppii> & legal_moves) {
-	gen_trymoves(board,legal_moves);
-	cull_illegal_moves(board,legal_moves);
-	return;
-}
-
-int query_state(const Board & board) {
-	//0 - ongoing, 1 - black wins, 2 - drawn, 3 - white wins
-	std::list<ppii> moves;
-	gen_moves(board, moves);
-	for (std::list<ppii>::iterator it = moves.begin(); it != moves.end(); it++) {
-	}
-	printf("\n");
-	if (!moves.empty()) return 0;
-	int kx=-1,ky=-1;
-	for (int i = 0; i < 8; i++) {
-		for (int j = 0; (j<8)&&(kx==-1); j++) {
-			if ((board.grid[i][j]==PIECE_WKING&&(board.turn%2==0)) ||
-					(board.grid[i][j]==PIECE_BKING&&(board.turn%2==1)) ) {
-						kx = i;
-						ky = j;
-						break;
-			}
-		}
-	}
-	Board nb;
-	memcpy(&nb,&board,sizeof(board));
-	nb.turn++;
-	if (is_attacked(nb,std::make_pair(kx,ky))) {
-		if (board.turn%2==0) return 1;
-		else return 3;
-	} else {
-		return 2;
-	}
-	return 0;
 }
 char print_piece(ChessPiece p) {
 	switch (p) {
@@ -109,95 +66,144 @@ char print_piece(ChessPiece p) {
 	}
 	return '.';
 }
-void print_board(const Board & board) {
+
+void Board::print() const {
 	for (int y = 7; y >= 0; y--) {
 		for (int x = 0; x < 8; x++) {
-			printf("%c", print_piece(board.grid[x][y]));
+			printf("%c", print_piece(grid[x][y]));
 		}
 		printf("\n");
 	}
 	return;
 }
-void Chess::print() {
-	print_board(board);
+
+void Chess::print() const {
+	board.print();
 	return;
 }
 
+
+bool Board::is_attacked(pii sq) const {
+	std::list<ppii> moves;
+	gen_trymoves(moves);
+	for (std::list<ppii>::iterator it = moves.begin(); it != moves.end(); it++) {
+		if (it->second == sq) return true;
+	}
+	return false;
+}
+
+void Board::gen_moves(std::list<ppii> & legal_moves) const {
+	gen_trymoves(legal_moves);
+	cull_illegal_moves(legal_moves);
+	return;
+}
+
+int Board::query_state() const {
+	//0 - ongoing, 1 - black wins, 2 - drawn, 3 - white wins
+	std::list<ppii> moves;
+	gen_moves(moves);
+	for (std::list<ppii>::iterator it = moves.begin(); it != moves.end(); it++) {
+	}
+	printf("\n");
+	if (!moves.empty()) return 0;
+	int kx=-1,ky=-1;
+	for (int i = 0; i < 8; i++) {
+		for (int j = 0; (j<8)&&(kx==-1); j++) {
+			if ((grid[i][j]==PIECE_WKING&&(turn%2==0)) ||
+					(grid[i][j]==PIECE_BKING&&(turn%2==1)) ) {
+						kx = i;
+						ky = j;
+						break;
+			}
+		}
+	}
+	Board nb;
+	memcpy(&nb,this,sizeof(nb));
+	nb.turn++;
+	if (nb.is_attacked(std::make_pair(kx,ky))) {
+		if (turn%2==0) return 1;
+		else return 3;
+	} else {
+		return 2;
+	}
+	return 0;
+}
+
 //Assumes correct input
-void shift_piece(Board & board, pii s, pii e, ChessPiece promote) {
+void Board::shift_piece(pii s, pii e, ChessPiece promote) {
 	int x1=s.first,y1=s.second,x2=e.first,y2=e.second;
 
-	ChessPiece piece = board.grid[x1][y1];
+	ChessPiece piece = grid[x1][y1];
 	//Fixing the castling
-	if (piece==PIECE_WKING) board.castling[0][0] = false;
-	else if (piece==PIECE_BKING) board.castling[1][0] = false;
+	if (piece==PIECE_WKING) castling[0][0] = false;
+	else if (piece==PIECE_BKING) castling[1][0] = false;
 	else if (piece==PIECE_WROOK) {
-		if (x1==0&&y1==0) board.castling[0][1] = false;
-		else if (x1==7&&y1==0) board.castling[0][2] = false;
+		if (x1==0&&y1==0) castling[0][1] = false;
+		else if (x1==7&&y1==0) castling[0][2] = false;
 	} else if (piece==PIECE_BROOK) {
-		if (x1==0&&y1==7) board.castling[1][1] = false;
-		else if (x1=7&&y1==7) board.castling[1][2] = false;
+		if (x1==0&&y1==7) castling[1][1] = false;
+		else if (x1=7&&y1==7) castling[1][2] = false;
 	}
 	//Setting enpassant file
 	if (piece==PIECE_WPAWN&&x1==x2&&y2==3&&y1==1) {
-		board.enpassant = x1;
+		enpassant = x1;
 	} else if (piece==PIECE_BPAWN&&x1==x2&&y1==6&&y2==4) {
-		board.enpassant = x1;
+		enpassant = x1;
 	}
 	//Doing an enpassant capture
-	if (piece==PIECE_WPAWN&&x1!=x2&&board.grid[x2][y2]==PIECE_EMPTY) {
-		board.grid[x2][y2-1] = PIECE_EMPTY;
-	} else if (piece==PIECE_BPAWN&&x1!=x2&&board.grid[x2][y2]==PIECE_EMPTY) {
-		board.grid[x2][y2+1] = PIECE_EMPTY;
+	if (piece==PIECE_WPAWN&&x1!=x2&&grid[x2][y2]==PIECE_EMPTY) {
+		grid[x2][y2-1] = PIECE_EMPTY;
+	} else if (piece==PIECE_BPAWN&&x1!=x2&&grid[x2][y2]==PIECE_EMPTY) {
+		grid[x2][y2+1] = PIECE_EMPTY;
 	}
 	//Doing the actual move
-	board.grid[x2][y2] = board.grid[x1][y1];
-	board.grid[x1][y1] = PIECE_EMPTY;
+	grid[x2][y2] = grid[x1][y1];
+	grid[x1][y1] = PIECE_EMPTY;
 	//Doing a castling move
 	if (piece==PIECE_WKING||piece==PIECE_BKING) {
 		if (x2==x1+2) {
-			board.grid[5][y1] = board.grid[7][y1];
-			board.grid[7][y1] = PIECE_EMPTY;
+			grid[5][y1] = grid[7][y1];
+			grid[7][y1] = PIECE_EMPTY;
 		} else if (x2==x1-2) {
-			board.grid[3][y1] = board.grid[0][y1];
-			board.grid[0][y1] = PIECE_EMPTY;
+			grid[3][y1] = grid[0][y1];
+			grid[0][y1] = PIECE_EMPTY;
 		}
 	}
 	//Doing a pawn promotion
 	if (piece==PIECE_WPAWN&&y2==7) {
-		board.grid[x2][y2] = promote;
+		grid[x2][y2] = promote;
 	} else if (piece==PIECE_BPAWN&&y2==0) {
-		board.grid[x2][y2] = promote;
+		grid[x2][y2] = promote;
 	}
 
-	board.turn++;
+	turn++;
 	return;
 }
 
-void gen_trymoves(const Board & board, std::list<ppii> & moves) {
+void Board::gen_trymoves(std::list<ppii> & moves) const {
 	for (int x = 0; x < 8; x++) {
 		for (int y = 0; y < 8; y++) {
-			if (board.grid[x][y]==PIECE_EMPTY||side(board.grid[x][y])!=(board.turn%2)) continue;
-			ChessPiece piece = board.grid[x][y];
+			if (grid[x][y]==PIECE_EMPTY||side(grid[x][y])!=(turn%2)) continue;
+			ChessPiece piece = grid[x][y];
 			pii cur = std::make_pair(x,y);
 			if (piece==PIECE_WPAWN||piece==PIECE_BPAWN) {
 				int sign = (piece==PIECE_WPAWN)?1:-1;
 				if (y+sign<0||y+sign>=8) continue;
-				if (board.grid[x][y+sign]==PIECE_EMPTY) {
+				if (grid[x][y+sign]==PIECE_EMPTY) {
 					//Normal pawn move
 					moves.push_back(std::make_pair(cur,std::make_pair(x,y+sign)));
 					if ((y==1&&sign==1)||(y==6&&sign==-1)) {
-						if (board.grid[x][y+2*sign]==PIECE_EMPTY) {
+						if (grid[x][y+2*sign]==PIECE_EMPTY) {
 							//Double pawn move
 							moves.push_back(std::make_pair(cur,std::make_pair(x,y+2*sign)));
 						}
 					}
 				}
 				//Pawn captures
-				if (x+1<8&&side(board.grid[x+1][y+sign])!=side(piece)) {
-					if (side(board.grid[x+1][y+sign])==1-side(piece)) {
+				if (x+1<8&&side(grid[x+1][y+sign])!=side(piece)) {
+					if (side(grid[x+1][y+sign])==1-side(piece)) {
 						moves.push_back(std::make_pair(cur,std::make_pair(x+1,y+sign)));
-					} else if (board.enpassant==x+1) { //Enpassant
+					} else if (enpassant==x+1) { //Enpassant
 						if (y==4&&sign==1) {
 							moves.push_back(std::make_pair(cur,std::make_pair(x+1,y+1)));
 						} else if (y==3&&sign==-1) {
@@ -205,10 +211,10 @@ void gen_trymoves(const Board & board, std::list<ppii> & moves) {
 						}
 					}
 				}
-				if (x-1>=0&&side(board.grid[x-1][y+sign])!=side(piece)) {
-					if (side(board.grid[x-1][y+sign])==1-side(piece)) {
+				if (x-1>=0&&side(grid[x-1][y+sign])!=side(piece)) {
+					if (side(grid[x-1][y+sign])==1-side(piece)) {
 						moves.push_back(std::make_pair(cur,std::make_pair(x-1,y+sign)));
-					} else if (board.enpassant==x-1) { //Enpassant
+					} else if (enpassant==x-1) { //Enpassant
 						if (y==4&&sign==1) {
 							moves.push_back(std::make_pair(cur,std::make_pair(x-1,y+1)));
 						} else if (y==3&&sign==-1) {
@@ -222,7 +228,7 @@ void gen_trymoves(const Board & board, std::list<ppii> & moves) {
 				for (int i = 0; i < 8; i++) {
 					int nx = x+delta[i][0],ny = y+delta[i][1];
 					if (nx<0||nx>=8||ny<0||ny>=8) continue;
-					if (side(board.grid[nx][ny])==side(piece)) continue;
+					if (side(grid[nx][ny])==side(piece)) continue;
 					moves.push_back(std::make_pair(cur,std::make_pair(nx,ny)));
 				}
 			} else if (piece==PIECE_WKING||piece==PIECE_BKING) {
@@ -231,23 +237,23 @@ void gen_trymoves(const Board & board, std::list<ppii> & moves) {
 				for (int i = 0; i < 8; i++) {
 					int nx = x+delta[i][0],ny = y+delta[i][1];
 					if (nx<0||nx>=8||ny<0||ny>=8) continue;
-					if (side(board.grid[nx][ny])==side(piece)) continue;
+					if (side(grid[nx][ny])==side(piece)) continue;
 					moves.push_back(std::make_pair(cur,std::make_pair(nx,ny)));
 				}
 				//castling
-				if (board.castling[side(piece)][0]) {
+				if (castling[side(piece)][0]) {
 					//0-0
-					if (board.grid[x+2][y]==PIECE_EMPTY &&
-							board.grid[x+1][y]==PIECE_EMPTY &&
-							board.castling[side(piece)][1]
+					if (grid[x+2][y]==PIECE_EMPTY &&
+							grid[x+1][y]==PIECE_EMPTY &&
+							castling[side(piece)][1]
 					) {
 						moves.push_back(std::make_pair(cur,std::make_pair(x+2,y)));
 					}
 					//0-0-0
-					if (board.grid[x-2][y]==PIECE_EMPTY &&
-							board.grid[x-1][y]==PIECE_EMPTY &&
-							board.grid[x-3][y]==PIECE_EMPTY &&
-							board.castling[side(piece)][2]
+					if (grid[x-2][y]==PIECE_EMPTY &&
+							grid[x-1][y]==PIECE_EMPTY &&
+							grid[x-3][y]==PIECE_EMPTY &&
+							castling[side(piece)][2]
 					) {
 						moves.push_back(std::make_pair(cur,std::make_pair(x-2,y)));
 					}
@@ -262,8 +268,8 @@ void gen_trymoves(const Board & board, std::list<ppii> & moves) {
 					for (int j = 1;;j++) {
 						int nx = x+j*delta[i][0],ny = y+j*delta[i][1];
 						if (nx<0||nx>=8||ny<0||ny>=8) break;
-						if (side(board.grid[nx][ny])==side(piece)) break;
-						if (side(board.grid[nx][ny])==1-side(piece)) capture = true;
+						if (side(grid[nx][ny])==side(piece)) break;
+						if (side(grid[nx][ny])==1-side(piece)) capture = true;
 						moves.push_back(std::make_pair(cur,std::make_pair(nx,ny)));
 						if (capture) break;
 					}
@@ -277,8 +283,8 @@ void gen_trymoves(const Board & board, std::list<ppii> & moves) {
 					for (int j = 1;;j++) {
 						int nx = x+j*delta[i][0],ny = y+j*delta[i][1];
 						if (nx<0||nx>=8||ny<0||ny>=8) break;
-						if (side(board.grid[nx][ny])==side(piece)) break;
-						if (side(board.grid[nx][ny])==1-side(piece)) capture = true;
+						if (side(grid[nx][ny])==side(piece)) break;
+						if (side(grid[nx][ny])==1-side(piece)) capture = true;
 						moves.push_back(std::make_pair(cur,std::make_pair(nx,ny)));
 						if (capture) break;
 					}
@@ -289,14 +295,14 @@ void gen_trymoves(const Board & board, std::list<ppii> & moves) {
 	return;
 }
 //TODO: Cull illegal moves for castling as well
-void cull_illegal_moves(const Board & board, std::list<ppii> & moves) {
+void Board::cull_illegal_moves(std::list<ppii> & moves) const {
 	bool erased = false;
 	for (std::list<ppii>::iterator it = moves.begin(); it != moves.end();) {
 		Board nb;
 		erased = false;
-		memcpy(&nb, &board, sizeof(board));
+		memcpy(&nb, this, sizeof(nb));
 		//Special case for castling
-		ChessPiece p = board.grid[it->first.first][it->first.second];
+		ChessPiece p = grid[it->first.first][it->first.second];
 		if (p==PIECE_WKING||p==PIECE_BKING) {
 			int x1,y1,x2,y2;
 			x1 = it->first.first;
@@ -306,16 +312,16 @@ void cull_illegal_moves(const Board & board, std::list<ppii> & moves) {
 			if (x2==x1+2||x2==x1-2) {
 				nb.turn++;
 				if (x2==x1+2) {
-					if (is_attacked(nb,std::make_pair(x1,y1)) ||
-							is_attacked(nb,std::make_pair(x1+1,y1)) ||
-							is_attacked(nb,std::make_pair(x1+2,y1))) {
+					if (nb.is_attacked(std::make_pair(x1,y1)) ||
+							nb.is_attacked(std::make_pair(x1+1,y1)) ||
+							nb.is_attacked(std::make_pair(x1+2,y1))) {
 						it = moves.erase(it);
 						continue;
 					}
 				} else if (x2==x1-2) {
-					if (is_attacked(nb,std::make_pair(x1,y1)) ||
-							is_attacked(nb,std::make_pair(x1-1,y1)) ||
-							is_attacked(nb,std::make_pair(x1-2,y1))) {
+					if (nb.is_attacked(std::make_pair(x1,y1)) ||
+							nb.is_attacked(std::make_pair(x1-1,y1)) ||
+							nb.is_attacked(std::make_pair(x1-2,y1))) {
 						it = moves.erase(it);
 						continue;
 					}
@@ -323,11 +329,11 @@ void cull_illegal_moves(const Board & board, std::list<ppii> & moves) {
 			}
 		}
 
-		shift_piece(nb,it->first,it->second);
+		nb.shift_piece(it->first,it->second);
 		int kx=-1,ky=-1;
 		for (int i = 0; (i < 8)&&(kx==-1); i++) {
 			for (int j = 0; j < 8; j++) {
-				if ((board.turn%2==0&&nb.grid[i][j]==PIECE_WKING)||(board.turn%2==1&&nb.grid[i][j]==PIECE_BKING)) {
+				if ((turn%2==0&&nb.grid[i][j]==PIECE_WKING)||(turn%2==1&&nb.grid[i][j]==PIECE_BKING)) {
 					kx = i;
 					ky = j;
 					break;
@@ -336,7 +342,7 @@ void cull_illegal_moves(const Board & board, std::list<ppii> & moves) {
 		}
 		if (kx==-1) return;
 		pii kp = std::make_pair(kx,ky);
-		if (is_attacked(nb,kp)) {
+		if (nb.is_attacked(kp)) {
 			//printf("Culled move %d,%d -> %d,%d\n", it->first.first, it->first.second, it->second.first, it->second.second);
 			it = moves.erase(it);
 			erased = true;
@@ -346,17 +352,20 @@ void cull_illegal_moves(const Board & board, std::list<ppii> & moves) {
 	return;
 }
 
-bool Chess::move(pii starting_square,pii ending_square, ChessPiece promotion) {
+bool Board::move(pii starting_square,pii ending_square, ChessPiece promotion) {
 	std::list<ppii> moves;
-	gen_moves(board,moves);
+	gen_moves(moves);
 	ppii p = std::make_pair(starting_square,ending_square);
 	for (std::list<ppii>::iterator it = moves.begin(); it != moves.end(); it++) {
 		if (*it==p) {
-			shift_piece(board,p.first,p.second,promotion);
+			shift_piece(p.first,p.second,promotion);
 			return true;
 		}
 	}
 	return false;
+}
+bool Chess::move(pii starting_square, pii ending_square, ChessPiece promotion) {
+	return board.move(starting_square, ending_square, promotion);
 }
 
 //TODO: Write this

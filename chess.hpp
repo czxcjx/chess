@@ -62,7 +62,7 @@ class Chess {
 		bool move(pii starting_square, pii ending_square,ChessPiece promotion=PIECE_EMPTY);
 		bool move(char * str);
 		void undo();
-		int query_state const;
+		int query_state() const;
 
 		void print() const;
 };

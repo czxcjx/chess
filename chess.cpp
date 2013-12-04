@@ -23,11 +23,16 @@ Chess::Chess() {
 		board.grid[i][6] = PIECE_BPAWN;
 		for (int j = 2; j <= 5; j++) board.grid[i][j] = PIECE_EMPTY;
 	}
-	board.turn = 0;
-	for (int i = 0; i < 3; i++) board.castling[0][i] = board.castling[1][i] = true;
-	board.enpassant = -1;
 }
 Chess::~Chess() {
+}
+
+Board::Board() {
+	enpassant = -1;
+	for (int i = 0; i < 3; i++) castling[0][i] = castling[1][i] = true;
+	n_boring_turns = 0;
+}
+Board::~Board() {
 }
 
 int side(ChessPiece c) {
@@ -35,6 +40,13 @@ int side(ChessPiece c) {
 	else if (c>=PIECE_WPAWN && c<=PIECE_WKING) return 0;
 	return 1;
 }
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Stuff for printing
+//
+//
+
 char print_piece(ChessPiece p) {
 	switch (p) {
 		case PIECE_EMPTY:
@@ -82,58 +94,17 @@ void Chess::print() const {
 	return;
 }
 
-
-bool Board::is_attacked(pii sq) const {
-	std::list<ppii> moves;
-	gen_trymoves(moves);
-	for (std::list<ppii>::iterator it = moves.begin(); it != moves.end(); it++) {
-		if (it->second == sq) return true;
-	}
-	return false;
-}
-
-void Board::gen_moves(std::list<ppii> & legal_moves) const {
-	gen_trymoves(legal_moves);
-	cull_illegal_moves(legal_moves);
-	return;
-}
-
-int Board::query_state() const {
-	//0 - ongoing, 1 - black wins, 2 - drawn, 3 - white wins
-	std::list<ppii> moves;
-	gen_moves(moves);
-	for (std::list<ppii>::iterator it = moves.begin(); it != moves.end(); it++) {
-	}
-	printf("\n");
-	if (!moves.empty()) return 0;
-	int kx=-1,ky=-1;
-	for (int i = 0; i < 8; i++) {
-		for (int j = 0; (j<8)&&(kx==-1); j++) {
-			if ((grid[i][j]==PIECE_WKING&&(turn%2==0)) ||
-					(grid[i][j]==PIECE_BKING&&(turn%2==1)) ) {
-						kx = i;
-						ky = j;
-						break;
-			}
-		}
-	}
-	Board nb;
-	memcpy(&nb,this,sizeof(nb));
-	nb.turn++;
-	if (nb.is_attacked(std::make_pair(kx,ky))) {
-		if (turn%2==0) return 1;
-		else return 3;
-	} else {
-		return 2;
-	}
-	return 0;
-}
+/////////////////////////////////////////////////////////////////////////////
+//
+// Helper function to do the actual piece shifting
+//
 
 //Assumes correct input
 void Board::shift_piece(pii s, pii e, ChessPiece promote) {
 	int x1=s.first,y1=s.second,x2=e.first,y2=e.second;
 
 	ChessPiece piece = grid[x1][y1];
+	n_boring_turns++;
 	//Fixing the castling
 	if (piece==PIECE_WKING) castling[0][0] = false;
 	else if (piece==PIECE_BKING) castling[1][0] = false;
@@ -156,6 +127,9 @@ void Board::shift_piece(pii s, pii e, ChessPiece promote) {
 	} else if (piece==PIECE_BPAWN&&x1!=x2&&grid[x2][y2]==PIECE_EMPTY) {
 		grid[x2][y2+1] = PIECE_EMPTY;
 	}
+	//Was it a capture  or a pawn move?
+	if (grid[x2][y2]!=PIECE_EMPTY) n_boring_turns = 0;
+	if (grid[x1][y1]==PIECE_WPAWN||grid[x1][y1]==PIECE_BPAWN) n_boring_turns = 0;
 	//Doing the actual move
 	grid[x2][y2] = grid[x1][y1];
 	grid[x1][y1] = PIECE_EMPTY;
@@ -180,6 +154,63 @@ void Board::shift_piece(pii s, pii e, ChessPiece promote) {
 	return;
 }
 
+/////////////////////////////////////////////////////////////////////////////
+//
+// Functions to get information about the board
+//
+//
+
+bool Board::is_attacked(pii sq) const {
+	std::list<ppii> moves;
+	gen_trymoves(moves);
+	for (std::list<ppii>::iterator it = moves.begin(); it != moves.end(); it++) {
+		if (it->second == sq) return true;
+	}
+	return false;
+}
+
+//Generates a list of legal moves
+void Board::gen_moves(std::list<ppii> & legal_moves) const {
+	gen_trymoves(legal_moves);
+	cull_illegal_moves(legal_moves);
+	return;
+}
+
+//Queries if the game is won or lost
+//0 - ongoing, 1 - black wins, 2 - drawn, 3 - white wins
+int Board::query_state() const {
+	std::list<ppii> moves;
+	gen_moves(moves);
+	if (!moves.empty()) return 0;
+	int kx=-1,ky=-1;
+	for (int i = 0; i < 8; i++) {
+		for (int j = 0; (j<8)&&(kx==-1); j++) {
+			if ((grid[i][j]==PIECE_WKING&&(turn%2==0)) ||
+					(grid[i][j]==PIECE_BKING&&(turn%2==1)) ) {
+						kx = i;
+						ky = j;
+						break;
+			}
+		}
+	}
+	Board nb;
+	memcpy(&nb,this,sizeof(nb));
+	nb.turn++;
+	if (nb.is_attacked(std::make_pair(kx,ky))) {
+		if (turn%2==0) return 1;
+		else return 3;
+	} else {
+		return 2;
+	}
+	if (n_boring_turns >= 100) return 2;
+	return 0;
+}
+int Chess::query_state() const {
+	return board.query_state();
+}
+
+//Generates list of moves
+//Does NOT exclude possibility of king being in check after your move
 void Board::gen_trymoves(std::list<ppii> & moves) const {
 	for (int x = 0; x < 8; x++) {
 		for (int y = 0; y < 8; y++) {
@@ -294,7 +325,8 @@ void Board::gen_trymoves(std::list<ppii> & moves) const {
 	}
 	return;
 }
-//TODO: Cull illegal moves for castling as well
+
+//Culls moves which will leave king in check
 void Board::cull_illegal_moves(std::list<ppii> & moves) const {
 	bool erased = false;
 	for (std::list<ppii>::iterator it = moves.begin(); it != moves.end();) {
@@ -352,6 +384,12 @@ void Board::cull_illegal_moves(std::list<ppii> & moves) const {
 	return;
 }
 
+/////////////////////////////////////////////////////////////////////////////
+//
+// Interface to move the pieces around
+//
+//
+
 bool Board::move(pii starting_square,pii ending_square, ChessPiece promotion) {
 	std::list<ppii> moves;
 	gen_moves(moves);
@@ -364,11 +402,22 @@ bool Board::move(pii starting_square,pii ending_square, ChessPiece promotion) {
 	}
 	return false;
 }
+
 bool Chess::move(pii starting_square, pii ending_square, ChessPiece promotion) {
-	return board.move(starting_square, ending_square, promotion);
+	history.push_back(board);
+	bool ret = board.move(starting_square, ending_square, promotion);
+	if (!ret) history.pop_back();
+	return ret;
+}
+
+void Chess::undo() {
+	if (history.empty()) return;
+	memcpy(&board, &history.back(), sizeof(board));
+	history.pop_back();
+	return;
 }
 
 //TODO: Write this
-bool Chess::move(std::string move_string) {
+bool Chess::move(char * str) {
 	return false;
 }

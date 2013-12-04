@@ -2,7 +2,6 @@
 #define CHESS_H
 
 #include <utility>
-#include <string>
 #include <cstring>
 #include <list>
 
@@ -27,17 +26,20 @@ typedef std::pair<int,int> pii;
 typedef std::pair<pii,pii> ppii;
 
 
-//TODO: implement 3fold rep and 50move draw
+//TODO: implement 3fold rep
 class Board {
 	private:
 		void gen_trymoves(std::list<ppii> & moves) const;
 		void cull_illegal_moves(std::list<ppii> & moves) const;
 		void shift_piece(pii s, pii e, ChessPiece promote = PIECE_EMPTY);
+		int enpassant; //En passant file
+		bool castling[2][3]; //have the king/rooks moved?
+		int n_boring_turns; //How many halfturns since a capture or pawn move
 
 	public:
+		Board();
+		~Board();
 		ChessPiece grid[8][8]; //a1 - [0][0], a8 = [0][7]
-		int enpassant;
-		bool castling[2][3];
 		int turn;
 
 		bool is_attacked(pii sq) const;
@@ -53,11 +55,14 @@ class Board {
 class Chess {
 	public:
 		Board board;
+		std::list<Board> history;
 		Chess();
 		~Chess();
 
 		bool move(pii starting_square, pii ending_square,ChessPiece promotion=PIECE_EMPTY);
-		bool move(std::string move_string);
+		bool move(char * str);
+		void undo();
+		int query_state const;
 
 		void print() const;
 };

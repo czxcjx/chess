@@ -15,7 +15,6 @@ int main () {
 		y1 = str[1]-'1';
 		x2 = str[2]-'a';
 		y2 = str[3]-'1';
-		printf("SCANNED: %s\n", str);
 		if (ch.move(make_pair(x1,y1),make_pair(x2,y2))) {
 			printf("Successful!\n");
 		} else {

@@ -116,6 +116,7 @@ void Board::shift_piece(pii s, pii e, ChessPiece promote) {
 		else if (x1=7&&y1==7) castling[1][2] = false;
 	}
 	//Setting enpassant file
+	enpassant = -1;
 	if (piece==PIECE_WPAWN&&x1==x2&&y2==3&&y1==1) {
 		enpassant = x1;
 	} else if (piece==PIECE_BPAWN&&x1==x2&&y1==6&&y2==4) {
